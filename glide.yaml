@@ -56,6 +56,8 @@ import:
   version: v1.1.2
 - package: github.com/ncw/swift
   version: master
+- package: github.com/prometheus/client_golang
+  version: v0.9.2
 - package: github.com/russross/blackfriday
   version: v1.5.2
 - package: github.com/spf13/cobra
@@ -112,3 +114,5 @@ import:
   version: release-10.0
 - package: kmodules.xyz/offshoot-api
   version: release-10.0
+- package: sigs.k8s.io/yaml
+  version: v1.1.0
