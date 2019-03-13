@@ -373,6 +373,7 @@ if [ "$KUBEDB_UNINSTALL" -eq 1 ]; then
   kubectl delete clusterrole -l app=kubedb
   kubectl delete rolebindings -l app=kubedb --namespace $KUBEDB_NAMESPACE
   kubectl delete role -l app=kubedb --namespace $KUBEDB_NAMESPACE
+  kubectl delete psp -l app=kubedb
 
   # delete servicemonitor and kubedb-operator-apiserver-cert secret. ignore error as they might not exist
   kubectl delete servicemonitor kubedb-${KUBEDB_OPERATOR_NAME}-servicemonitor --namespace $PROMETHEUS_NAMESPACE || true

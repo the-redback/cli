@@ -4,7 +4,6 @@ import (
 	"math/rand"
 	"os"
 	"time"
-
 	"github.com/kubedb/cli/pkg/cmds"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"kmodules.xyz/client-go/logs"
