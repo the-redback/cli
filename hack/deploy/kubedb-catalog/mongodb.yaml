@@ -83,6 +83,8 @@ spec:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongodb_exporter:v1.0.0"
   tools:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongo-tools:3.4-v2"
+  initContainer:
+    image: "${KUBEDB_DOCKER_REGISTRY}/busybox"
 
 ---
 apiVersion: catalog.kubedb.com/v1alpha1
@@ -99,6 +101,8 @@ spec:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongodb_exporter:v1.0.0"
   tools:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongo-tools:3.6-v2"
+  initContainer:
+    image: "${KUBEDB_DOCKER_REGISTRY}/busybox"
 
 ---
 apiVersion: catalog.kubedb.com/v1alpha1
@@ -115,6 +119,8 @@ spec:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongodb_exporter:v1.0.0"
   tools:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongo-tools:4.0.5"
+  initContainer:
+    image: "${KUBEDB_DOCKER_REGISTRY}/busybox"
 
 ---
 apiVersion: catalog.kubedb.com/v1alpha1
@@ -131,6 +137,8 @@ spec:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongodb_exporter:v1.0.0"
   tools:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongo-tools:4.0"
+  initContainer:
+    image: "${KUBEDB_DOCKER_REGISTRY}/busybox"
 
 ---
 apiVersion: catalog.kubedb.com/v1alpha1
@@ -147,3 +155,5 @@ spec:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongodb_exporter:v1.0.0"
   tools:
     image: "${KUBEDB_DOCKER_REGISTRY}/mongo-tools:4.1.7"
+  initContainer:
+    image: "${KUBEDB_DOCKER_REGISTRY}/busybox"
