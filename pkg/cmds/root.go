@@ -32,7 +32,7 @@ func NewKubeDBCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 		Run: runHelp,
 	}
 
-	databases.AddPostgresCMD(cmds)
+	databases.AddDatabaseCMDs(cmds)
 
 	flags := cmds.PersistentFlags()
 	// Normalize all flags that are coming from other packages or pre-configurations
