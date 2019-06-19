@@ -2,16 +2,12 @@ package databases
 
 import (
 	"fmt"
-	"io"
+	shell "github.com/codeskyblue/go-sh"
+	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
-
-	v1 "k8s.io/api/core/v1"
-
-	shell "github.com/codeskyblue/go-sh"
-	"github.com/spf13/cobra"
 )
 
 func addMysqlCMD(cmds *cobra.Command) {
@@ -42,7 +38,10 @@ func addMysqlCMD(cmds *cobra.Command) {
 			}
 			mysqlName = args[0]
 			//mysqlConnect(namespace, mysqlName)
-			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, mysqlName, secretName)
+			//TODO: proper podname secretname extraction from mysql
+			podName := mysqlName+"-0"
+			secretName := mysqlName+"-auth"
+			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
@@ -63,18 +62,20 @@ func addMysqlCMD(cmds *cobra.Command) {
 				log.Fatal("Enter mysql object's name as an argument. Your commands will be applied on a database inside it's primary pod")
 			}
 			mysqlName = args[0]
-
-			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, mysqlName, secretName)
+			//TODO: proper podname secretname extraction from mysql
+			podName := mysqlName+"-0"
+			secretName := mysqlName+"-auth"
+			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
 
 			if command != "" {
-				mysqlApplyCommand(auth, tunnel.Local, command, dbname)
+				mysqlApplyCommand(auth, tunnel.Local, dbname, command)
 			}
 
 			if fileName != "" {
-				mysqlApplySql(auth, tunnel.Local, fileName, dbname)
+				mysqlApplyFile(auth, tunnel.Local, dbname, fileName)
 			}
 
 			if fileName == "" && command == "" {
@@ -100,57 +101,56 @@ func addMysqlCMD(cmds *cobra.Command) {
 
 func mysqlConnect(auth *v1.Secret, localPort int, username string) {
 	sh := shell.NewSession()
-	sh.ShowCMD = true
-	pass := string(auth.Data["password"])
+	sh.ShowCMD = false
 	err := sh.Command("docker", "run",
-		"-e", fmt.Sprintf("MYSQL_PWD=%s", pass),
+		"-e", fmt.Sprintf("MYSQL_PWD=%s", auth.Data["password"]),
 		"--network=host", "-it", "mysql",
 		"mysql",
-		"--host=127.0.0.1",
-		fmt.Sprintf("--port=%d", localPort),
+		"--host=127.0.0.1", fmt.Sprintf("--port=%d", localPort),
 		fmt.Sprintf("--user=%s", username)).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func mysqlApplySql(auth *v1.Secret, localPort int, fileName string, dbname string) {
-	sh := shell.NewSession()
-	sh.ShowCMD = false
-
+func mysqlApplyFile(auth *v1.Secret, localPort int, dbname string, fileName string) {
 	fileName, err := filepath.Abs(fileName)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	var reader io.Reader
-	reader, err = os.Open(fileName)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	tempFileName := "/tmp/my.sql"
 
-	err = sh.Command("mysql",
+	println("Applying commands from file: ", fileName)
+	sh := shell.NewSession()
+	err = sh.Command("docker", "run",
+		"--network=host",
+		"-e", fmt.Sprintf("MYSQL_PWD=%s", auth.Data["password"]),
+		"-v", fmt.Sprintf("%s:%s", fileName, tempFileName), "mysql",
+		"mysql",
 		"--host=127.0.0.1", fmt.Sprintf("--port=%d", localPort),
 		fmt.Sprintf("--user=%s", auth.Data["username"]),
-		fmt.Sprintf("--password=%s", auth.Data["password"]), dbname).SetStdin(reader).Run()
+		"-e", fmt.Sprintf("source %s", tempFileName),
+	).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	println("Commands applied from file")
+	println("Commands applied")
 }
 
-func mysqlApplyCommand(auth *v1.Secret, localPort int, command string, dbname string) {
+func mysqlApplyCommand(auth *v1.Secret, localPort int, dbname string, command string) {
+	println("Applying command(s): ", command)
 	sh := shell.NewSession()
-	sh.ShowCMD = false
-
-	var reader io.Reader
-	reader = strings.NewReader(command)
-
-	err := sh.Command("mysql",
+	err := sh.Command("docker", "run",
+		"-e", fmt.Sprintf("MYSQL_PWD=%s", auth.Data["password"]),
+		"--network=host", "mysql",
+		"mysql",
 		"--host=127.0.0.1", fmt.Sprintf("--port=%d", localPort),
 		fmt.Sprintf("--user=%s", auth.Data["username"]),
-		fmt.Sprintf("--password=%s", auth.Data["password"]), dbname).SetStdin(reader).Run()
+		dbname, "-e",command,
+	).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	println("Command applied")
+
+	println("Commands applied")
 }

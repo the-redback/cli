@@ -75,6 +75,8 @@ github.com/go-openapi/jsonreference
 github.com/go-openapi/spec
 # github.com/go-openapi/swag v0.19.0
 github.com/go-openapi/swag
+# github.com/go-stack/stack v1.8.0
+github.com/go-stack/stack
 # github.com/gogo/protobuf v1.2.1
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/sortkeys
@@ -88,6 +90,8 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
+# github.com/golang/snappy v0.0.1
+github.com/golang/snappy
 # github.com/google/btree v1.0.0
 github.com/google/btree
 # github.com/google/go-cmp v0.3.0
@@ -130,10 +134,14 @@ github.com/json-iterator/go
 github.com/konsorten/go-windows-terminal-sequences
 # github.com/kubedb/apimachinery v0.0.0-20190526014453-48e4bab67179
 github.com/kubedb/apimachinery/apis/kubedb/v1alpha1
+github.com/kubedb/apimachinery/client/clientset/versioned
 github.com/kubedb/apimachinery/client/clientset/versioned/scheme
 github.com/kubedb/apimachinery/client/clientset/versioned/typed/kubedb/v1alpha1
 github.com/kubedb/apimachinery/apis
 github.com/kubedb/apimachinery/apis/kubedb
+github.com/kubedb/apimachinery/client/clientset/versioned/typed/authorization/v1alpha1
+github.com/kubedb/apimachinery/client/clientset/versioned/typed/catalog/v1alpha1
+github.com/kubedb/apimachinery/client/clientset/versioned/typed/config/v1alpha1
 github.com/kubedb/apimachinery/apis/authorization/v1alpha1
 github.com/kubedb/apimachinery/apis/catalog/v1alpha1
 github.com/kubedb/apimachinery/apis/config/v1alpha1
@@ -170,13 +178,49 @@ github.com/spf13/cobra/doc
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
+# github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
+github.com/xdg/scram
+# github.com/xdg/stringprep v1.0.0
+github.com/xdg/stringprep
 # github.com/yudai/gojsondiff v0.0.0-20180504020246-0525c875b75c
 github.com/yudai/gojsondiff
 github.com/yudai/gojsondiff/formatter
 # github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82
 github.com/yudai/golcs
+# go.mongodb.org/mongo-driver v1.0.3
+go.mongodb.org/mongo-driver/bson
+go.mongodb.org/mongo-driver/mongo
+go.mongodb.org/mongo-driver/mongo/options
+go.mongodb.org/mongo-driver/bson/bsoncodec
+go.mongodb.org/mongo-driver/bson/bsonrw
+go.mongodb.org/mongo-driver/bson/bsontype
+go.mongodb.org/mongo-driver/bson/primitive
+go.mongodb.org/mongo-driver/x/bsonx/bsoncore
+go.mongodb.org/mongo-driver/event
+go.mongodb.org/mongo-driver/mongo/readconcern
+go.mongodb.org/mongo-driver/mongo/readpref
+go.mongodb.org/mongo-driver/mongo/writeconcern
+go.mongodb.org/mongo-driver/x/bsonx
+go.mongodb.org/mongo-driver/x/mongo/driver
+go.mongodb.org/mongo-driver/x/mongo/driver/auth
+go.mongodb.org/mongo-driver/x/mongo/driver/session
+go.mongodb.org/mongo-driver/x/mongo/driver/topology
+go.mongodb.org/mongo-driver/x/mongo/driver/uuid
+go.mongodb.org/mongo-driver/x/network/command
+go.mongodb.org/mongo-driver/x/network/connection
+go.mongodb.org/mongo-driver/x/network/connstring
+go.mongodb.org/mongo-driver/x/network/description
+go.mongodb.org/mongo-driver/x/network/result
+go.mongodb.org/mongo-driver/tag
+go.mongodb.org/mongo-driver/x/network/wiremessage
+go.mongodb.org/mongo-driver/x/mongo/driver/auth/internal/gssapi
+go.mongodb.org/mongo-driver/x/network/address
+go.mongodb.org/mongo-driver/version
+go.mongodb.org/mongo-driver/x/network/compressor
+go.mongodb.org/mongo-driver/internal
 # golang.org/x/crypto v0.0.0-20190506204251-e1dfcc566284
 golang.org/x/crypto/ssh/terminal
+golang.org/x/crypto/pbkdf2
 # golang.org/x/net v0.0.0-20190503192946-f4e77d36d62c
 golang.org/x/net/http2
 golang.org/x/net/http/httpguts
@@ -190,6 +234,8 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
+# golang.org/x/sync v0.0.0-20190227155943-e225da77a7e6
+golang.org/x/sync/semaphore
 # golang.org/x/sys v0.0.0-20190508220229-2d0786266e9c
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -223,8 +269,8 @@ gopkg.in/inf.v0
 # gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20190503110853-61630f889b3c => k8s.io/api v0.0.0-20190313235455-40a48860b5ab
-k8s.io/api/apps/v1
 k8s.io/api/core/v1
+k8s.io/api/apps/v1
 k8s.io/api/autoscaling/v1
 k8s.io/api/extensions/v1beta1
 k8s.io/api/admission/v1beta1
@@ -298,23 +344,23 @@ k8s.io/apimachinery/pkg/util/yaml
 k8s.io/apimachinery/pkg/runtime/serializer/json
 k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
-k8s.io/apimachinery/pkg/util/validation
 k8s.io/apimachinery/pkg/util/mergepatch
 k8s.io/apimachinery/pkg/util/strategicpatch
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/util/net
 k8s.io/apimachinery/pkg/apis/meta/internalversion
+k8s.io/apimachinery/pkg/util/validation
 k8s.io/apimachinery/third_party/forked/golang/reflect
 k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/runtime/serializer/protobuf
 k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 k8s.io/apimachinery/pkg/util/framer
-k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/third_party/forked/golang/json
-k8s.io/apimachinery/pkg/util/httpstream
-k8s.io/apimachinery/pkg/util/httpstream/spdy
+k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/pkg/util/cache
 k8s.io/apimachinery/pkg/util/diff
+k8s.io/apimachinery/pkg/util/httpstream
+k8s.io/apimachinery/pkg/util/httpstream/spdy
 k8s.io/apimachinery/pkg/util/remotecommand
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/pkg/api/validation
@@ -338,11 +384,11 @@ k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kv
 # k8s.io/client-go v11.0.0+incompatible
 k8s.io/client-go/plugin/pkg/client/auth
 k8s.io/client-go/dynamic
+k8s.io/client-go/rest
+k8s.io/client-go/tools/watch
 k8s.io/client-go/kubernetes
 k8s.io/client-go/tools/clientcmd
 k8s.io/client-go/util/homedir
-k8s.io/client-go/rest
-k8s.io/client-go/tools/watch
 k8s.io/client-go/kubernetes/typed/core/v1
 k8s.io/client-go/plugin/pkg/client/auth/azure
 k8s.io/client-go/plugin/pkg/client/auth/gcp
@@ -354,8 +400,18 @@ k8s.io/client-go/restmapper
 k8s.io/client-go/tools/clientcmd/api
 k8s.io/client-go/util/jsonpath
 k8s.io/client-go/kubernetes/scheme
-k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1
+k8s.io/client-go/scale
 k8s.io/client-go/kubernetes/typed/apps/v1
+k8s.io/client-go/util/retry
+k8s.io/client-go/pkg/version
+k8s.io/client-go/plugin/pkg/client/auth/exec
+k8s.io/client-go/rest/watch
+k8s.io/client-go/tools/metrics
+k8s.io/client-go/transport
+k8s.io/client-go/util/cert
+k8s.io/client-go/util/flowcontrol
+k8s.io/client-go/tools/cache
+k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1
 k8s.io/client-go/kubernetes/typed/apps/v1beta1
 k8s.io/client-go/kubernetes/typed/apps/v1beta2
 k8s.io/client-go/kubernetes/typed/auditregistration/v1alpha1
@@ -389,23 +445,12 @@ k8s.io/client-go/kubernetes/typed/settings/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1
 k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1beta1
-k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/tools/auth
 k8s.io/client-go/tools/clientcmd/api/latest
-k8s.io/client-go/scale
 k8s.io/client-go/tools/portforward
 k8s.io/client-go/transport/spdy
-k8s.io/client-go/util/retry
-k8s.io/client-go/pkg/version
-k8s.io/client-go/plugin/pkg/client/auth/exec
-k8s.io/client-go/rest/watch
-k8s.io/client-go/tools/metrics
-k8s.io/client-go/transport
-k8s.io/client-go/util/cert
-k8s.io/client-go/tools/cache
 k8s.io/client-go/tools/reference
 k8s.io/client-go/third_party/forked/golang/template
-k8s.io/client-go/tools/clientcmd/api/v1
 k8s.io/client-go/scale/scheme
 k8s.io/client-go/scale/scheme/appsint
 k8s.io/client-go/scale/scheme/appsv1beta1
@@ -420,6 +465,7 @@ k8s.io/client-go/pkg/apis/clientauthentication/v1beta1
 k8s.io/client-go/util/connrotation
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/tools/pager
+k8s.io/client-go/tools/clientcmd/api/v1
 k8s.io/client-go/util/exec
 # k8s.io/cloud-provider v0.0.0-20190508104637-039924654234 => k8s.io/cloud-provider v0.0.0-20190314002645-c892ea32361a
 k8s.io/cloud-provider/features

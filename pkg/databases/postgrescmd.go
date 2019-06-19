@@ -6,10 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	v1 "k8s.io/api/core/v1"
-
 	shell "github.com/codeskyblue/go-sh"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 )
 
 func addPostgresCMD(cmds *cobra.Command) {
@@ -38,7 +37,10 @@ func addPostgresCMD(cmds *cobra.Command) {
 			}
 			pgName = args[0]
 			//pgConnect(namespace, pgName)
-			auth, tunnel, err := tunnelToDBPod(pgPort, namespace, pgName, secretName)
+			//TODO: proper podname secretname extraction from postgres
+			podName := pgName+"-0"
+			secretName := pgName+"-auth"
+			auth, tunnel, err := tunnelToDBPod(pgPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
@@ -64,13 +66,16 @@ func addPostgresCMD(cmds *cobra.Command) {
 				log.Fatal(" Use --file or --command to apply supported commands to a postgres object's pods")
 			}
 
-			auth, tunnel, err := tunnelToDBPod(pgPort, namespace, pgName, secretName)
+			//TODO: proper podname secretname extraction from postgres
+			podName := pgName+"-0"
+			secretName := pgName+"-auth"
+			auth, tunnel, err := tunnelToDBPod(pgPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
 
 			if command != "" {
-				pgApplyCommand(auth, tunnel.Local, command, dbname)
+				pgApplyCommand(auth, tunnel.Local,dbname, command)
 			}
 
 			if fileName != "" {
@@ -216,13 +221,9 @@ func pgApplySql(auth *v1.Secret, localPort int, fileName string) {
 	}
 }
 
-func pgApplyCommand(auth *v1.Secret, localPort int, command string, dbname string) {
+func pgApplyCommand(auth *v1.Secret, localPort int, dbname string,  command string) {
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
-
-	for key, data := range auth.Data {
-		println("Auth Data = ", key, data)
-	}
 
 	sh.ShowCMD = true
 

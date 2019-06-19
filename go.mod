@@ -12,11 +12,16 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v0.0.0-20160318181535-f6a740d52f96 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/golang/snappy v0.0.1 // indirect
 	github.com/kubedb/apimachinery v0.0.0-20190526014453-48e4bab67179
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/mitchellh/go-wordwrap v1.0.0 // indirect
 	github.com/spf13/cobra v0.0.4
+	github.com/tidwall/pretty v1.0.0 // indirect
+	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c // indirect
+	github.com/xdg/stringprep v1.0.0 // indirect
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
+	go.mongodb.org/mongo-driver v1.0.3
 	golang.org/x/sys v0.0.0-20190508220229-2d0786266e9c // indirect
 	k8s.io/api v0.0.0-20190503110853-61630f889b3c
 	k8s.io/apiextensions-apiserver v0.0.0-20190508224317-421cff06bf05 // indirect
