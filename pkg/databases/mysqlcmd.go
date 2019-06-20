@@ -1,22 +1,29 @@
 package databases
 
 import (
+	"errors"
 	"fmt"
-	shell "github.com/codeskyblue/go-sh"
-	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"k8s.io/client-go/kubernetes"
+
+	shell "github.com/codeskyblue/go-sh"
+	apiv1aplpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
+	cs "github.com/kubedb/apimachinery/client/clientset/versioned"
+	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
 func addMysqlCMD(cmds *cobra.Command) {
-	var mysqlPort = 3306
 	var mysqlName string
-	var dbname string
+	var dbName string
 	var namespace string
-	var userName string
-	var secretName string
 	var fileName string
 	var command string
 	var mysqlCmd = &cobra.Command{
@@ -37,49 +44,54 @@ func addMysqlCMD(cmds *cobra.Command) {
 				log.Fatal("Enter mysql object's name as an argument")
 			}
 			mysqlName = args[0]
-			//mysqlConnect(namespace, mysqlName)
-			//TODO: proper podname secretname extraction from mysql
-			podName := mysqlName+"-0"
-			secretName := mysqlName+"-auth"
-			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, podName, secretName)
+
+			podName, secretName, err := getMysqlInfo(namespace, mysqlName)
 			if err != nil {
-				log.Fatal("Couldn't tunnel through. Error = ", err)
+				log.Fatal(err)
 			}
-			mysqlConnect(auth, tunnel.Local, userName)
+
+			auth, tunnel, err := tunnelToDBPod(apiv1aplpha1.MySQLNodePort, namespace, podName, secretName)
+			if err != nil {
+				log.Fatal(err)
+			}
+			mysqlConnect(auth, tunnel.Local)
 			tunnel.Close()
 		},
 	}
 
 	var mysqlApplyCmd = &cobra.Command{
 		Use:   "apply",
-		Short: "Apply SQL commands to a mysql pod",
-		Long: `Use this cmd to apply SQL commands from a file to a mysql object's' primary pod.
+		Short: "Apply commands to a mysql pod",
+		Long: `Use this cmd to apply commands from a file to a mysql object's' primary pod.
 				Syntax: $ kubedb mysql apply <mysql-name> -n <namespace> -f <fileName>
 				`,
 		Run: func(cmd *cobra.Command, args []string) {
-			println("Applying SQl")
+			println("Applying commands...")
 			if len(args) == 0 {
 				log.Fatal("Enter mysql object's name as an argument. Your commands will be applied on a database inside it's primary pod")
 			}
 			mysqlName = args[0]
-			//TODO: proper podname secretname extraction from mysql
-			podName := mysqlName+"-0"
-			secretName := mysqlName+"-auth"
-			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, podName, secretName)
+
+			podName, secretName, err := getMysqlInfo(namespace, mysqlName)
 			if err != nil {
-				log.Fatal("Couldn't tunnel through. Error = ", err)
+				log.Fatal(err)
+			}
+
+			auth, tunnel, err := tunnelToDBPod(apiv1aplpha1.MySQLNodePort, namespace, podName, secretName)
+			if err != nil {
+				log.Fatal(err)
 			}
 
 			if command != "" {
-				mysqlApplyCommand(auth, tunnel.Local, dbname, command)
+				mysqlApplyCommand(auth, tunnel.Local, dbName, command)
 			}
 
 			if fileName != "" {
-				mysqlApplyFile(auth, tunnel.Local, dbname, fileName)
+				mysqlApplyFile(auth, tunnel.Local, dbName, fileName)
 			}
 
 			if fileName == "" && command == "" {
-				log.Fatal(" Use --file or --command to apply SQL to mysql database pods")
+				log.Fatal(" Use --file or --command to apply commands to mysql pods")
 			}
 
 			tunnel.Close()
@@ -90,16 +102,14 @@ func addMysqlCMD(cmds *cobra.Command) {
 	mysqlCmd.AddCommand(mysqlConnectCmd)
 	mysqlCmd.AddCommand(mysqlApplyCmd)
 	mysqlCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace of the mysql object to connect to.")
-	mysqlCmd.PersistentFlags().StringVarP(&userName, "username", "u", "root", "Username of the mysql object to connect to.")
-	mysqlCmd.PersistentFlags().StringVarP(&secretName, "customsecret", "", "", "Name of custom secret of the mysql object to connect to.")
 
 	mysqlApplyCmd.Flags().StringVarP(&fileName, "file", "f", "", "path to sql file")
 	mysqlApplyCmd.Flags().StringVarP(&command, "command", "c", "", "command to execute")
-	mysqlApplyCmd.Flags().StringVarP(&dbname, "dbname", "d", "mysql", "name of database inside mysql-db pod to execute command")
+	mysqlApplyCmd.Flags().StringVarP(&dbName, "dbName", "d", "mysql", "name of database inside mysql-db pod to execute command")
 
 }
 
-func mysqlConnect(auth *v1.Secret, localPort int, username string) {
+func mysqlConnect(auth *corev1.Secret, localPort int) {
 	sh := shell.NewSession()
 	sh.ShowCMD = false
 	err := sh.Command("docker", "run",
@@ -107,13 +117,13 @@ func mysqlConnect(auth *v1.Secret, localPort int, username string) {
 		"--network=host", "-it", "mysql",
 		"mysql",
 		"--host=127.0.0.1", fmt.Sprintf("--port=%d", localPort),
-		fmt.Sprintf("--user=%s", username)).SetStdin(os.Stdin).Run()
+		fmt.Sprintf("--user=%s", auth.Data["username"])).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func mysqlApplyFile(auth *v1.Secret, localPort int, dbname string, fileName string) {
+func mysqlApplyFile(auth *corev1.Secret, localPort int, dbname string, fileName string) {
 	fileName, err := filepath.Abs(fileName)
 	if err != nil {
 		log.Fatalln(err)
@@ -128,16 +138,16 @@ func mysqlApplyFile(auth *v1.Secret, localPort int, dbname string, fileName stri
 		"-v", fmt.Sprintf("%s:%s", fileName, tempFileName), "mysql",
 		"mysql",
 		"--host=127.0.0.1", fmt.Sprintf("--port=%d", localPort),
-		fmt.Sprintf("--user=%s", auth.Data["username"]),
+		fmt.Sprintf("--user=%s", auth.Data["username"]), dbname,
 		"-e", fmt.Sprintf("source %s", tempFileName),
 	).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	println("Commands applied")
+	println("Command(s) applied")
 }
 
-func mysqlApplyCommand(auth *v1.Secret, localPort int, dbname string, command string) {
+func mysqlApplyCommand(auth *corev1.Secret, localPort int, dbname string, command string) {
 	println("Applying command(s): ", command)
 	sh := shell.NewSession()
 	err := sh.Command("docker", "run",
@@ -146,11 +156,69 @@ func mysqlApplyCommand(auth *v1.Secret, localPort int, dbname string, command st
 		"mysql",
 		"--host=127.0.0.1", fmt.Sprintf("--port=%d", localPort),
 		fmt.Sprintf("--user=%s", auth.Data["username"]),
-		dbname, "-e",command,
+		dbname, "-e", command,
 	).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	println("Commands applied")
+	println("Command(s) applied")
+}
+
+func getMysqlInfo(namespace string, dbObjectName string) (podName string, secretName string, err error) {
+	masterURL := ""
+	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
+
+	config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
+	if err != nil {
+		log.Fatalf("Could not get Kubernetes config: %s", err)
+	}
+	dbClient := cs.NewForConfigOrDie(config)
+	mysql, err := dbClient.KubedbV1alpha1().MySQLs(namespace).Get(dbObjectName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	if mysql.Status.Phase != apiv1aplpha1.DatabasePhaseRunning {
+		return "", "", errors.New("MySQL is not ready")
+	}
+	secretName = mysql.Spec.DatabaseSecret.SecretName
+	if mysql.Spec.Topology == nil {
+		podName = dbObjectName + "-0" //standalone mode
+	} else {
+		tempPodName := dbObjectName + "-0"
+		client := kubernetes.NewForConfigOrDie(config)
+		_, err = client.CoreV1().Pods(namespace).Get(tempPodName, metav1.GetOptions{})
+		if err != nil {
+			log.Fatal("Pods are not ready")
+		}
+		command := "select MEMBER_HOST from performance_schema.replication_group_members" +
+			" INNER JOIN performance_schema.global_status ON " +
+			"performance_schema.replication_group_members.MEMBER_ID=performance_schema.global_status.VARIABLE_VALUE;"
+		auth, tunnel, err := tunnelToDBPod(apiv1aplpha1.MySQLNodePort, namespace, tempPodName, secretName)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		sh := shell.NewSession()
+		sh.ShowCMD = false
+		out, err := sh.Command("docker", "run",
+			"-e", fmt.Sprintf("MYSQL_PWD=%s", auth.Data["password"]),
+			"--network=host", "-it", "mysql",
+			"mysql",
+			"--host=127.0.0.1", fmt.Sprintf("--port=%d", tunnel.Local),
+			fmt.Sprintf("--user=%s", auth.Data["username"]), "mysql",
+			"-NBse", command,
+		).SetStdin(os.Stdin).Output()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		primaryHostName := strings.TrimPrefix(string(out), " ")
+		for i := 0; i < int(*(mysql.Spec.Replicas)); i++ {
+			tempPodName = fmt.Sprintf(dbObjectName+"-%v", i)
+			if strings.Contains(primaryHostName, tempPodName) {
+				podName = tempPodName
+				break
+			}
+		}
+	}
+	return podName, secretName, nil
 }

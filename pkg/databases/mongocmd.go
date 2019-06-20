@@ -10,13 +10,13 @@ import (
 	"strings"
 
 	shell "github.com/codeskyblue/go-sh"
-	api "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
+	apiv1alpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
 	cs "github.com/kubedb/apimachinery/client/clientset/versioned"
 	"github.com/spf13/cobra"
 	"go.mongodb.org/mongo-driver/bson"
 	mgo "go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -31,7 +31,6 @@ const (
 )
 
 func addMongoCMD(cmds *cobra.Command) {
-	var mgPort = 27017
 	var mgName string
 	var namespace string
 	var fileName string
@@ -56,11 +55,11 @@ func addMongoCMD(cmds *cobra.Command) {
 			}
 			mgName = args[0]
 			//get db pod and secret
-			podName, secretName, err := getDatabaseInfo(namespace,mgName)
+			podName, secretName, err := getMongoDBInfo(namespace,mgName)
 			if err != nil {
 				log.Fatal(err)
 			}
-			auth, tunnel, err := tunnelToDBPod(mgPort, namespace, podName, secretName)
+			auth, tunnel, err := tunnelToDBPod(apiv1alpha1.MongoDBMongosPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
@@ -86,11 +85,11 @@ func addMongoCMD(cmds *cobra.Command) {
 				log.Fatal(" Use --file or --command to apply supported commands to a mongodb object's pods")
 			}
 
-			podName, secretName, err := getDatabaseInfo(namespace,mgName)
+			podName, secretName, err := getMongoDBInfo(namespace,mgName)
 			if err != nil {
 				log.Fatal(err)
 			}
-			auth, tunnel, err := tunnelToDBPod(mgPort, namespace, podName, secretName)
+			auth, tunnel, err := tunnelToDBPod(apiv1alpha1.MongoDBMongosPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
@@ -112,11 +111,11 @@ func addMongoCMD(cmds *cobra.Command) {
 	mgCmd.AddCommand(mgApplyCmd)
 	mgCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace of the mongodb object to connect to.")
 
-	mgApplyCmd.Flags().StringVarP(&fileName, "file", "f", "", "path to sql file")
+	mgApplyCmd.Flags().StringVarP(&fileName, "file", "f", "", "path to command file")
 	mgApplyCmd.Flags().StringVarP(&command, "command", "c", "", "command to execute")
 }
 
-func mgConnect(auth *v1.Secret, localPort int) {
+func mgConnect(auth *corev1.Secret, localPort int) {
 	sh := shell.NewSession()
 	sh.ShowCMD = false
 
@@ -132,7 +131,7 @@ func mgConnect(auth *v1.Secret, localPort int) {
 	}
 }
 
-func mgApplyCommand(auth *v1.Secret, localPort int, command string) {
+func mgApplyCommand(auth *corev1.Secret, localPort int, command string) {
 	sh := shell.NewSession()
 	sh.ShowCMD = false
 	err := sh.Command("docker", "run", "--network=host", "mongo",
@@ -148,7 +147,7 @@ func mgApplyCommand(auth *v1.Secret, localPort int, command string) {
 	println("Command(s) applied")
 }
 
-func mgApplyFile(auth *v1.Secret, localPort int, fileName string) {
+func mgApplyFile(auth *corev1.Secret, localPort int, fileName string) {
 	sh := shell.NewSession()
 	sh.ShowCMD = false
 	fileName, err := filepath.Abs(fileName)
@@ -172,20 +171,20 @@ func mgApplyFile(auth *v1.Secret, localPort int, fileName string) {
 	println("File applied")
 }
 
-func getDatabaseInfo(namespace string, dbObjectName string) (podName string, secretName string, err error) {
+func getMongoDBInfo(namespace string, dbObjectName string) (podName string, secretName string, err error) {
 	masterURL := ""
 	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
 
 	config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
 	if err != nil {
-		log.Fatalf("Could not get Kubernetes config: %s", err)
+		return "", "", err
 	}
 	dbClient := cs.NewForConfigOrDie(config)
 	mongo, err := dbClient.KubedbV1alpha1().MongoDBs(namespace).Get(dbObjectName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
-	if mongo.Status.Phase != api.DatabasePhaseRunning {
+	if mongo.Status.Phase != apiv1alpha1.DatabasePhaseRunning {
 		return "", "", errors.New("MongoDB is not ready")
 	}
 	secretName = mongo.Spec.DatabaseSecret.SecretName
@@ -194,7 +193,7 @@ func getDatabaseInfo(namespace string, dbObjectName string) (podName string, sec
 	return podName, secretName, nil
 }
 
-func getPrimaryPodName(config *rest.Config, mongo *api.MongoDB) (podName string) {
+func getPrimaryPodName(config *rest.Config, mongo *apiv1alpha1.MongoDB) (podName string) {
 	if mongo.Spec.ReplicaSet == nil && mongo.Spec.ShardTopology == nil {
 		//one mongo, without shard
 		podName = fmt.Sprintf("%v-0", mongo.Name)
@@ -209,7 +208,7 @@ func getPrimaryPodName(config *rest.Config, mongo *api.MongoDB) (podName string)
 	return podName
 }
 
-func GetMongosPodName(config *rest.Config, mongo *api.MongoDB) (mongosPodName string) {
+func GetMongosPodName(config *rest.Config, mongo *apiv1alpha1.MongoDB) (mongosPodName string) {
 	client := kubernetes.NewForConfigOrDie(config)
 	pods, err := client.CoreV1().Pods(mongo.Namespace).List(metav1.ListOptions{})
 	if err != nil {
@@ -223,7 +222,7 @@ func GetMongosPodName(config *rest.Config, mongo *api.MongoDB) (mongosPodName st
 	return mongosPodName
 }
 
-func GetReplicaMasterNode(mongo *api.MongoDB) (string, error) {
+func GetReplicaMasterNode(mongo *apiv1alpha1.MongoDB) (string, error) {
 	replicaNumber := mongo.Spec.Replicas
 	if replicaNumber == nil {
 		return "", fmt.Errorf("replica is zero")
@@ -251,7 +250,6 @@ func GetReplicaMasterNode(mongo *api.MongoDB) (string, error) {
 	// Extract information `IsMaster: true` from the component's status.
 	for i := int32(0); i <= *replicaNumber; i++ {
 		clientPodName := fmt.Sprintf("%v-%d", mongo.Name, i)
-		println("Client pod name  = ", clientPodName)
 		var isMaster bool
 		isMaster, err := fn(clientPodName)
 		if err == nil && isMaster {
@@ -261,7 +259,7 @@ func GetReplicaMasterNode(mongo *api.MongoDB) (string, error) {
 	return "", fmt.Errorf("no primary node")
 }
 
-func ConnectAndPing(mongo *api.MongoDB, clientPodName string, isReplSet bool) (*mgo.Client, *portforward.Tunnel, error) {
+func ConnectAndPing(mongo *apiv1alpha1.MongoDB, clientPodName string, isReplSet bool) (*mgo.Client, *portforward.Tunnel, error) {
 	masterURL := ""
 	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
 
@@ -302,10 +300,6 @@ func ConnectAndPing(mongo *api.MongoDB, clientPodName string, isReplSet bool) (*
 	clientOpts := options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s@127.0.0.1:%v", user, password, tunnel.Local))
 	if isReplSet {
 		clientOpts.SetDirect(true)
-	}
-
-	if err != nil {
-		return nil, nil, err
 	}
 
 	clnt, err := mgo.Connect(context.Background(), clientOpts)

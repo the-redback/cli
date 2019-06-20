@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -21,7 +21,7 @@ func AddDatabaseCMDs(cmds *cobra.Command) {
 	addMongoCMD(cmds)
 }
 
-func tunnelToDBPod(dbPort int, namespace string, podName string, secretName string) (*v1.Secret, *portforward.Tunnel, error) {
+func tunnelToDBPod(dbPort int, namespace string, podName string, secretName string) (*corev1.Secret, *portforward.Tunnel, error) {
 	//TODO: Always close the tunnel after using thing function
 	masterURL := ""
 	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")

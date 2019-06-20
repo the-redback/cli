@@ -1,22 +1,33 @@
 package databases
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/appscode/go/types"
 	shell "github.com/codeskyblue/go-sh"
+	apiv1alpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
+	cs "github.com/kubedb/apimachinery/client/clientset/versioned"
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+)
+
+const (
+	primaryRoleLabel = "primary"
+	pgPort           = 5432
 )
 
 func addPostgresCMD(cmds *cobra.Command) {
-	var pgPort = 5432
 	var pgName string
 	var dbname string
 	var namespace string
-	var secretName string
 	var fileName string
 	var command string
 	var pgCmd = &cobra.Command{
@@ -36,10 +47,12 @@ func addPostgresCMD(cmds *cobra.Command) {
 				log.Fatal("Enter postgres object's name as an argument")
 			}
 			pgName = args[0]
-			//pgConnect(namespace, pgName)
-			//TODO: proper podname secretname extraction from postgres
-			podName := pgName+"-0"
-			secretName := pgName+"-auth"
+
+			podName, secretName, err := getPostgresInfo(namespace, pgName)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			auth, tunnel, err := tunnelToDBPod(pgPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
@@ -51,12 +64,12 @@ func addPostgresCMD(cmds *cobra.Command) {
 
 	var pgApplyCmd = &cobra.Command{
 		Use:   "apply",
-		Short: "Apply SQL commands to a postgres object's pod",
-		Long: `Use this cmd to apply SQL commands from a file to a postgres object's primary pod.
+		Short: "Apply commands to a postgres object's pod",
+		Long: `Use this cmd to apply commands from a file to a postgres object's primary pod.
 				Syntax: $ kubedb postgres apply <pg-object-name> -n <namespace> -f <fileName>
 				`,
 		Run: func(cmd *cobra.Command, args []string) {
-			println("Applying SQl")
+			println("Applying commands")
 			if len(args) == 0 {
 				log.Fatal("Enter postgres object's name as an argument. Your commands will be applied on a database inside it's primary pod")
 			}
@@ -66,16 +79,18 @@ func addPostgresCMD(cmds *cobra.Command) {
 				log.Fatal(" Use --file or --command to apply supported commands to a postgres object's pods")
 			}
 
-			//TODO: proper podname secretname extraction from postgres
-			podName := pgName+"-0"
-			secretName := pgName+"-auth"
+			podName, secretName, err := getPostgresInfo(namespace, pgName)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			auth, tunnel, err := tunnelToDBPod(pgPort, namespace, podName, secretName)
 			if err != nil {
-				log.Fatal("Couldn't tunnel through. Error = ", err)
+				log.Fatal(err)
 			}
 
 			if command != "" {
-				pgApplyCommand(auth, tunnel.Local,dbname, command)
+				pgApplyCommand(auth, tunnel.Local, dbname, command)
 			}
 
 			if fileName != "" {
@@ -86,105 +101,17 @@ func addPostgresCMD(cmds *cobra.Command) {
 		},
 	}
 
-	//var pgCreateDbCmd = &cobra.Command{
-	//	Use:   "createdb",
-	//	Short: "Create logical database inside a postgres database pod",
-	//	Long: `Use this cmd to applyreate logical database inside a postgres DB primary pod.
-	//			Syntax: $ kubedb postgres createdb <logical-db-name> -n <namespace> <pg-name>
-	//			`,
-	//	Run: func(cmd *cobra.Command, args []string) {
-	//		println("Creating Logical DataBase")
-	//		if len(args) < 2 {
-	//			log.Fatal("Enter names of logical database and its parent postgres database. Your logical database will be created" +
-	//				" in a database inside postgres' primary pod")
-	//		}
-	//		dbName = args[0]
-	//		pgName = args[1]
-	//
-	//		auth, tunnel, err := tunnelToDBPod(namespace, pgName)
-	//		if err != nil {
-	//			log.Fatal("Couldn't tunnel through. Error = ", err)
-	//		}
-	//
-	//		if command != "" {
-	//			pgApplyCommand(auth, tunnel.Local, command, dbname)
-	//		}
-	//
-	//		if fileName != "" {
-	//			pgApplySql(auth, tunnel.Local, fileName)
-	//		}
-	//
-	//		tunnel.Close()
-	//	},
-	//}
-
 	cmds.AddCommand(pgCmd)
 	pgCmd.AddCommand(pgConnectCmd)
 	pgCmd.AddCommand(pgApplyCmd)
-	//pgCmd.AddCommand(pgCreateDbCmd)
 	pgCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace of the postgres object to connect to.")
-	pgCmd.PersistentFlags().StringVarP(&secretName, "customsecret", "", "", "Name of custom secret of the postgres object to connect to.")
 
-	//pgApplyCmd.Flags().StringVarP(&secretName, "secret", "s", "", "Name of user created secret for the postgres object.")
 	pgApplyCmd.Flags().StringVarP(&fileName, "file", "f", "", "path to sql file")
 	pgApplyCmd.Flags().StringVarP(&command, "command", "c", "", "command to execute")
 	pgApplyCmd.Flags().StringVarP(&dbname, "dbname", "d", "postgres", "name of database inside postgres object's pod to execute command")
 }
 
-//func tunnelToPod(namespace string, dbCrdName string, customSecretName string) (*v1.Secret, *portforward.Tunnel, error) {
-//	//TODO: Always close the tunnel after using thing function
-//	masterURL := ""
-//	var podName string
-//	var secretName string
-//	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
-//
-//	config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
-//	if err != nil {
-//		println("Could not get Kubernetes config: %s", err)
-//		return nil, nil, err
-//	}
-//
-//	// kubedb postgres connect -n demo  quick-postgres
-//
-//	client, err := kubernetes.NewForConfig(config)
-//	if err != nil {
-//		return nil, nil, err
-//	}
-//	if namespace == "" {
-//		println("Using default namespace. Enter your namespace using -n=<your-namespace>")
-//	}
-//	podName = dbCrdName + "-0"
-//
-//	if customSecretName == "" {
-//		secretName = dbCrdName + "-auth"
-//	} else {
-//		secretName = customSecretName
-//	}
-//
-//	port := 5432
-//
-//	_, err = client.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
-//	if err != nil {
-//		if kerr.IsNotFound(err) {
-//			fmt.Println("Pod doesn't exist")
-//		}
-//		return nil, nil, err
-//	}
-//	auth, err := client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
-//	if err != nil {
-//		log.Fatalln(err)
-//	}
-//
-//	tunnel := portforward.NewTunnel(client.CoreV1().RESTClient(), config, namespace, podName, port)
-//	err = tunnel.ForwardPort()
-//	if err != nil {
-//		log.Fatalln(err)
-//	}
-//
-//	return auth, tunnel, err
-//}
-
-func pgConnect(auth *v1.Secret, localPort int) {
+func pgConnect(auth *corev1.Secret, localPort int) {
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
 	sh.ShowCMD = true
@@ -199,7 +126,7 @@ func pgConnect(auth *v1.Secret, localPort int) {
 	}
 }
 
-func pgApplySql(auth *v1.Secret, localPort int, fileName string) {
+func pgApplySql(auth *corev1.Secret, localPort int, fileName string) {
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
 	sh.ShowCMD = true
@@ -221,7 +148,7 @@ func pgApplySql(auth *v1.Secret, localPort int, fileName string) {
 	}
 }
 
-func pgApplyCommand(auth *v1.Secret, localPort int, dbname string,  command string) {
+func pgApplyCommand(auth *corev1.Secret, localPort int, dbname string, command string) {
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
 
@@ -237,4 +164,42 @@ func pgApplyCommand(auth *v1.Secret, localPort int, dbname string,  command stri
 	if err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func getPostgresInfo(namespace string, dbObjectName string) (podName string, secretName string, err error) {
+	masterURL := ""
+	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
+
+	config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
+	if err != nil {
+		return "", "", err
+	}
+	dbClient := cs.NewForConfigOrDie(config)
+	postgres, err := dbClient.KubedbV1alpha1().Postgreses(namespace).Get(dbObjectName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	if postgres.Status.Phase != apiv1alpha1.DatabasePhaseRunning {
+		return "", "", errors.New("postgres is not ready")
+	}
+	secretName = postgres.Spec.DatabaseSecret.SecretName
+	if postgres.Spec.Replicas == types.Int32P(1) {
+		podName = dbObjectName + "-0" //standalone mode
+	} else {
+		client := kubernetes.NewForConfigOrDie(config)
+
+		for i := 0; i < int(*(postgres.Spec.Replicas)); i++ {
+			tempPodName := fmt.Sprintf(dbObjectName+"-%v", i)
+			pod, err := client.CoreV1().Pods(namespace).Get(tempPodName, metav1.GetOptions{})
+			if err != nil {
+				return "", "", err
+			}
+
+			if pod.Labels[apiv1alpha1.LabelRole] == primaryRoleLabel {
+				podName = tempPodName
+				break
+			}
+		}
+	}
+	return podName, secretName, nil
 }
