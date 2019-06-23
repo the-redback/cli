@@ -19,6 +19,7 @@ func AddDatabaseCMDs(cmds *cobra.Command) {
 	addPostgresCMD(cmds)
 	addMysqlCMD(cmds)
 	addMongoCMD(cmds)
+	addRedisCMD(cmds)
 }
 
 func tunnelToDBPod(dbPort int, namespace string, podName string, secretName string) (*corev1.Secret, *portforward.Tunnel, error) {

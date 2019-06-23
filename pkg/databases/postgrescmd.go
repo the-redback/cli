@@ -114,7 +114,7 @@ func addPostgresCMD(cmds *cobra.Command) {
 func pgConnect(auth *corev1.Secret, localPort int) {
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
-	sh.ShowCMD = true
+	sh.ShowCMD = false
 
 	err := sh.Command("docker", "run", "--network=host", "-it",
 		"postgres:11.1-alpine",
@@ -129,7 +129,7 @@ func pgConnect(auth *corev1.Secret, localPort int) {
 func pgApplySql(auth *corev1.Secret, localPort int, fileName string) {
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
-	sh.ShowCMD = true
+	sh.ShowCMD = false
 
 	fileName, err := filepath.Abs(fileName)
 	if err != nil {
@@ -152,7 +152,7 @@ func pgApplyCommand(auth *corev1.Secret, localPort int, dbname string, command s
 	sh := shell.NewSession()
 	sh.SetEnv("PGPASSWORD", string(auth.Data["POSTGRES_PASSWORD"]))
 
-	sh.ShowCMD = true
+	sh.ShowCMD = false
 
 	err := sh.Command("docker", "run", "--network=host", "-it",
 		"postgres:11.1-alpine",
