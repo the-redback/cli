@@ -182,3 +182,5 @@ func getRedisInfo(namespace, dbObjectName string) (podName string, err error) {
 	}
 	return podName, nil
 }
+
+//TODO: redis apply lua script

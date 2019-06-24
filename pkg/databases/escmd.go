@@ -1,0 +1,177 @@
+package databases
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+
+	shell "github.com/codeskyblue/go-sh"
+	apiv1alpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
+	cs "github.com/kubedb/apimachinery/client/clientset/versioned"
+	"github.com/spf13/cobra"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
+)
+
+const (
+	esPort         = apiv1alpha1.ElasticsearchRestPort
+	nodeRoleClient = "node.role.client"
+	username       = "ADMIN_USERNAME"
+	password       = "ADMIN_PASSWORD"
+)
+
+func addElasticsearchCMD(cmds *cobra.Command) {
+	var esName string
+	var dbname string
+	var namespace string
+	var fileName string
+	var command string
+	var esCmd = &cobra.Command{
+		Use:   "elasticsearch",
+		Short: "Use to operate elasticsearch pods",
+		Long:  `Use this cmd to operate elasticsearch pods.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			println("Use subcommands such as connect or apply to operate PSQL pods")
+		},
+	}
+	var esConnectCmd = &cobra.Command{
+		Use:   "connect",
+		Short: "Connect to a elasticsearch object's pod",
+		Long:  `Use this cmd to exec into a elasticsearch object's primary pod.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) == 0 {
+				log.Fatal("Enter elasticsearch object's name as an argument")
+			}
+			esName = args[0]
+
+			podName, secretName, err := getElasticsearchInfo(namespace, esName)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			auth, tunnel, err := tunnelToDBPod(esPort, namespace, podName, secretName)
+			if err != nil {
+				log.Fatal("Couldn't tunnel through. Error = ", err)
+			}
+			esConnect(auth, tunnel.Local)
+			tunnel.Close()
+		},
+	}
+
+	var esApplyCmd = &cobra.Command{
+		Use:   "apply",
+		Short: "Apply commands to a elasticsearch object's pod",
+		Long: `Use this cmd to apply commands from a file to a elasticsearch object's primary pod.
+				Syntax: $ kubedb elasticsearch apply <es-object-name> -n <namespace> -f <fileName>
+				`,
+		Run: func(cmd *cobra.Command, args []string) {
+			println("Applying commands")
+			if len(args) == 0 {
+				log.Fatal("Enter elasticsearch object's name as an argument. Your commands will be applied on a database inside it's primary pod")
+			}
+			esName = args[0]
+
+			if fileName == "" && command == "" {
+				log.Fatal(" Use --file or --command to apply supported commands to a elasticsearch object's pods")
+			}
+
+			podName, secretName, err := getElasticsearchInfo(namespace, esName)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			auth, tunnel, err := tunnelToDBPod(esPort, namespace, podName, secretName)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if command != "" {
+				esApplyCommand(auth, tunnel.Local, dbname, command)
+			}
+
+			if fileName != "" {
+				esApplyFile(auth, tunnel.Local, fileName)
+			}
+
+			tunnel.Close()
+		},
+	}
+
+	cmds.AddCommand(esCmd)
+	esCmd.AddCommand(esConnectCmd)
+	esCmd.AddCommand(esApplyCmd)
+	esCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace of the elasticsearch object to connect to.")
+
+	esApplyCmd.Flags().StringVarP(&fileName, "file", "f", "", "path to sql file")
+	esApplyCmd.Flags().StringVarP(&command, "command", "c", "", "command to execute")
+	esApplyCmd.Flags().StringVarP(&dbname, "dbname", "d", "elasticsearch", "name of database inside elasticsearch object's pod to execute command")
+}
+
+func esConnect(auth *corev1.Secret, localPort int) {
+	sh := shell.NewSession()
+	sh.ShowCMD = true
+	println("Secret Name = ", auth.Name)
+	//kc exec -it -n demo elasticsearch-cluster-shard0-0 -- elasticsearch-cli -n 0 -c -h elasticsearch-cluster-shard0-0 -p 6379 LPUSH gt  "t"
+	err := sh.Command("docker", "run", "--network=host", "-it",
+		"-e", fmt.Sprintf("USERNAME=%s", auth.Data[username]), "-e", fmt.Sprintf("PASSWORD=%s", auth.Data[password]),
+		"-e", fmt.Sprintf("ADDRESS=localhost:%d", localPort),
+		"rezoan/alpine-curl:latest",
+	).SetStdin(os.Stdin).Run()
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func esApplyFile(auth *corev1.Secret, localPort int, fileName string) {
+
+}
+
+func esApplyCommand(auth *corev1.Secret, localPort int, dbname string, command string) {
+
+}
+
+func getElasticsearchInfo(namespace, dbObjectName string) (podName string, secretName string, err error) {
+	masterURL := ""
+	kubeconfigPath := filepath.Join(homedir.HomeDir(), ".kube", "config")
+
+	config, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfigPath)
+	if err != nil {
+		log.Fatalf("Could not get Kubernetes config: %s", err)
+	}
+	dbClient := cs.NewForConfigOrDie(config)
+	elasticsearch, err := dbClient.KubedbV1alpha1().Elasticsearches(namespace).Get(dbObjectName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	if elasticsearch.Status.Phase != apiv1alpha1.DatabasePhaseRunning {
+		return "", "", errors.New("elasticsearch is not ready")
+	}
+	//if cluster is enabled
+	client := kubernetes.NewForConfigOrDie(config)
+	secretName = dbObjectName + "-auth"
+	_, err = client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", "", err
+	}
+	label := labels.Set{
+		apiv1alpha1.LabelDatabaseKind: apiv1alpha1.ResourceKindElasticsearch,
+		apiv1alpha1.LabelDatabaseName: dbObjectName,
+	}.String()
+	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: label})
+	if err != nil {
+		return "", "", err
+	}
+	for _, pod := range pods.Items {
+		if elasticsearch.Spec.Topology == nil || pod.Labels[nodeRoleClient] == "set" {
+			podName = pod.Name
+			break
+		}
+	}
+	return podName, secretName, nil
+}
