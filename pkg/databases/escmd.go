@@ -28,10 +28,7 @@ const (
 
 func addElasticsearchCMD(cmds *cobra.Command) {
 	var esName string
-	var dbname string
 	var namespace string
-	var fileName string
-	var command string
 	var esCmd = &cobra.Command{
 		Use:   "elasticsearch",
 		Short: "Use to operate elasticsearch pods",
@@ -64,53 +61,9 @@ func addElasticsearchCMD(cmds *cobra.Command) {
 		},
 	}
 
-	var esApplyCmd = &cobra.Command{
-		Use:   "apply",
-		Short: "Apply commands to a elasticsearch object's pod",
-		Long: `Use this cmd to apply commands from a file to a elasticsearch object's primary pod.
-				Syntax: $ kubedb elasticsearch apply <es-object-name> -n <namespace> -f <fileName>
-				`,
-		Run: func(cmd *cobra.Command, args []string) {
-			println("Applying commands")
-			if len(args) == 0 {
-				log.Fatal("Enter elasticsearch object's name as an argument. Your commands will be applied on a database inside it's primary pod")
-			}
-			esName = args[0]
-
-			if fileName == "" && command == "" {
-				log.Fatal(" Use --file or --command to apply supported commands to a elasticsearch object's pods")
-			}
-
-			podName, secretName, err := getElasticsearchInfo(namespace, esName)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			auth, tunnel, err := tunnelToDBPod(esPort, namespace, podName, secretName)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			if command != "" {
-				esApplyCommand(auth, tunnel.Local, dbname, command)
-			}
-
-			if fileName != "" {
-				esApplyFile(auth, tunnel.Local, fileName)
-			}
-
-			tunnel.Close()
-		},
-	}
-
 	cmds.AddCommand(esCmd)
 	esCmd.AddCommand(esConnectCmd)
-	esCmd.AddCommand(esApplyCmd)
 	esCmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "", "Namespace of the elasticsearch object to connect to.")
-
-	esApplyCmd.Flags().StringVarP(&fileName, "file", "f", "", "path to sql file")
-	esApplyCmd.Flags().StringVarP(&command, "command", "c", "", "command to execute")
-	esApplyCmd.Flags().StringVarP(&dbname, "dbname", "d", "elasticsearch", "name of database inside elasticsearch object's pod to execute command")
 }
 
 func esConnect(auth *corev1.Secret, localPort int) {
@@ -126,14 +79,6 @@ func esConnect(auth *corev1.Secret, localPort int) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-}
-
-func esApplyFile(auth *corev1.Secret, localPort int, fileName string) {
-
-}
-
-func esApplyCommand(auth *corev1.Secret, localPort int, dbname string, command string) {
-
 }
 
 func getElasticsearchInfo(namespace, dbObjectName string) (podName string, secretName string, err error) {
