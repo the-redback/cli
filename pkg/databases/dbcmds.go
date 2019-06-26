@@ -5,6 +5,7 @@ import (
 	"log"
 	"path/filepath"
 
+	apiv1alpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -13,6 +14,21 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"kmodules.xyz/client-go/tools/portforward"
+)
+
+const (
+	alpineCurlImg    = "rezoan/alpine-curl:latest"
+	alpineTelnetImg  = "rezoan/telnet-curl:latest"
+	esAdminUsername  = "ADMIN_USERNAME"
+	esAdminPassword  = "ADMIN_PASSWORD"
+	esNodeRoleClient = "node.role.client"
+	esPort           = apiv1alpha1.ElasticsearchRestPort
+	mcPort           = 11211
+	mgPassword       = "password"
+	mgPort           = apiv1alpha1.MongoDBMongosPort
+	mysqlPort        = apiv1alpha1.MySQLNodePort
+	pgPort           = 5432
+	primaryRoleLabel = "primary"
 )
 
 func AddDatabaseCMDs(cmds *cobra.Command) {

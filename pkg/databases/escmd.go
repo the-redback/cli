@@ -19,13 +19,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-const (
-	esPort         = apiv1alpha1.ElasticsearchRestPort
-	nodeRoleClient = "node.role.client"
-	username       = "ADMIN_USERNAME"
-	password       = "ADMIN_PASSWORD"
-)
-
 func addElasticsearchCMD(cmds *cobra.Command) {
 	var esName string
 	var namespace string
@@ -68,13 +61,10 @@ func addElasticsearchCMD(cmds *cobra.Command) {
 
 func esConnect(auth *corev1.Secret, localPort int) {
 	sh := shell.NewSession()
-	sh.ShowCMD = true
-	println("Secret Name = ", auth.Name)
-	//kc exec -it -n demo elasticsearch-cluster-shard0-0 -- elasticsearch-cli -n 0 -c -h elasticsearch-cluster-shard0-0 -p 6379 LPUSH gt  "t"
 	err := sh.Command("docker", "run", "--network=host", "-it",
-		"-e", fmt.Sprintf("USERNAME=%s", auth.Data[username]), "-e", fmt.Sprintf("PASSWORD=%s", auth.Data[password]),
+		"-e", fmt.Sprintf("USERNAME=%s", auth.Data[esAdminUsername]), "-e", fmt.Sprintf("PASSWORD=%s", auth.Data[esAdminPassword]),
 		"-e", fmt.Sprintf("ADDRESS=localhost:%d", localPort),
-		"rezoan/alpine-curl:latest",
+		alpineCurlImg,
 	).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
@@ -97,7 +87,6 @@ func getElasticsearchInfo(namespace, dbObjectName string) (podName string, secre
 	if elasticsearch.Status.Phase != apiv1alpha1.DatabasePhaseRunning {
 		return "", "", errors.New("elasticsearch is not ready")
 	}
-	//if cluster is enabled
 	client := kubernetes.NewForConfigOrDie(config)
 	secretName = dbObjectName + "-auth"
 	_, err = client.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{})
@@ -113,7 +102,7 @@ func getElasticsearchInfo(namespace, dbObjectName string) (podName string, secre
 		return "", "", err
 	}
 	for _, pod := range pods.Items {
-		if elasticsearch.Spec.Topology == nil || pod.Labels[nodeRoleClient] == "set" {
+		if elasticsearch.Spec.Topology == nil || pod.Labels[esNodeRoleClient] == "set" {
 			podName = pod.Name
 			break
 		}

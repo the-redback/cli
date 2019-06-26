@@ -19,11 +19,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-const (
-	primaryRoleLabel = "primary"
-	pgPort           = 5432
-)
-
 func addPostgresCMD(cmds *cobra.Command) {
 	var pgName string
 	var dbname string

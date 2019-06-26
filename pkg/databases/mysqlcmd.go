@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	shell "github.com/codeskyblue/go-sh"
-	apiv1aplpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
+	apiv1alpha1 "github.com/kubedb/apimachinery/apis/kubedb/v1alpha1"
 	cs "github.com/kubedb/apimachinery/client/clientset/versioned"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -49,7 +49,7 @@ func addMysqlCMD(cmds *cobra.Command) {
 				log.Fatal(err)
 			}
 
-			auth, tunnel, err := tunnelToDBPod(apiv1aplpha1.MySQLNodePort, namespace, podName, secretName)
+			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -76,7 +76,7 @@ func addMysqlCMD(cmds *cobra.Command) {
 				log.Fatal(err)
 			}
 
-			auth, tunnel, err := tunnelToDBPod(apiv1aplpha1.MySQLNodePort, namespace, podName, secretName)
+			auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -177,7 +177,7 @@ func getMysqlInfo(namespace string, dbObjectName string) (podName string, secret
 	if err != nil {
 		return "", "", err
 	}
-	if mysql.Status.Phase != apiv1aplpha1.DatabasePhaseRunning {
+	if mysql.Status.Phase != apiv1alpha1.DatabasePhaseRunning {
 		return "", "", errors.New("MySQL is not ready")
 	}
 	secretName = mysql.Spec.DatabaseSecret.SecretName
@@ -193,7 +193,7 @@ func getMysqlInfo(namespace string, dbObjectName string) (podName string, secret
 		command := "select MEMBER_HOST from performance_schema.replication_group_members" +
 			" INNER JOIN performance_schema.global_status ON " +
 			"performance_schema.replication_group_members.MEMBER_ID=performance_schema.global_status.VARIABLE_VALUE;"
-		auth, tunnel, err := tunnelToDBPod(apiv1aplpha1.MySQLNodePort, namespace, tempPodName, secretName)
+		auth, tunnel, err := tunnelToDBPod(mysqlPort, namespace, tempPodName, secretName)
 		if err != nil {
 			log.Fatalln(err)
 		}

@@ -26,16 +26,11 @@ import (
 	"kmodules.xyz/client-go/tools/portforward"
 )
 
-const (
-	keyMongoDBPassword = "password"
-)
-
 func addMongoCMD(cmds *cobra.Command) {
 	var mgName string
 	var namespace string
 	var fileName string
 	var command string
-
 
 	var mgCmd = &cobra.Command{
 		Use:   "mongodb",
@@ -55,11 +50,11 @@ func addMongoCMD(cmds *cobra.Command) {
 			}
 			mgName = args[0]
 			//get db pod and secret
-			podName, secretName, err := getMongoDBInfo(namespace,mgName)
+			podName, secretName, err := getMongoDBInfo(namespace, mgName)
 			if err != nil {
 				log.Fatal(err)
 			}
-			auth, tunnel, err := tunnelToDBPod(apiv1alpha1.MongoDBMongosPort, namespace, podName, secretName)
+			auth, tunnel, err := tunnelToDBPod(mgPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
@@ -85,11 +80,11 @@ func addMongoCMD(cmds *cobra.Command) {
 				log.Fatal(" Use --file or --command to apply supported commands to a mongodb object's pods")
 			}
 
-			podName, secretName, err := getMongoDBInfo(namespace,mgName)
+			podName, secretName, err := getMongoDBInfo(namespace, mgName)
 			if err != nil {
 				log.Fatal(err)
 			}
-			auth, tunnel, err := tunnelToDBPod(apiv1alpha1.MongoDBMongosPort, namespace, podName, secretName)
+			auth, tunnel, err := tunnelToDBPod(mgPort, namespace, podName, secretName)
 			if err != nil {
 				log.Fatal("Couldn't tunnel through. Error = ", err)
 			}
@@ -295,7 +290,7 @@ func ConnectAndPing(mongo *apiv1alpha1.MongoDB, clientPodName string, isReplSet 
 	if err != nil {
 		return nil, nil, err
 	}
-	password := string(secret.Data[keyMongoDBPassword])
+	password := string(secret.Data[mgPassword])
 
 	clientOpts := options.Client().ApplyURI(fmt.Sprintf("mongodb://%s:%s@127.0.0.1:%v", user, password, tunnel.Local))
 	if isReplSet {

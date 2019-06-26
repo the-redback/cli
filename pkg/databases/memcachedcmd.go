@@ -19,10 +19,6 @@ import (
 	"kmodules.xyz/client-go/tools/portforward"
 )
 
-const (
-	mcPort = 11211
-)
-
 func addMemcachedCMD(cmds *cobra.Command) {
 	var mcName string
 	var namespace string
@@ -67,7 +63,7 @@ func mcConnect(port int) {
 	println("Connected to memcached :")
 	sh := shell.NewSession()
 	err := sh.Command("docker", "run", "--network=host", "-it",
-		"rezoan/alpine-telnet:latest", "127.0.0.1", strconv.Itoa(port),
+		alpineTelnetImg, "127.0.0.1", strconv.Itoa(port),
 	).SetStdin(os.Stdin).Run()
 	if err != nil {
 		log.Fatalln(err)
